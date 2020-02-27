@@ -9,6 +9,7 @@ import torch.backends.cudnn as cudnn
 import torchvision
 
 from model import Net
+from osnet import osnet_x0_25
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
@@ -28,16 +29,16 @@ if torch.cuda.is_available() and not args.no_cuda:
 # data loading
 root = args.data_dir
 train_dir = os.path.join(root, "train")
-test_dir = os.path.join(root, "test")
+test_dir = os.path.join(root, "val")
 transform_train = torchvision.transforms.Compose([
-    torchvision.transforms.RandomCrop((128, 64), padding=4),
+    torchvision.transforms.RandomCrop((256, 256), padding=4),
     torchvision.transforms.RandomHorizontalFlip(),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                      [0.229, 0.224, 0.225])
 ])
 transform_test = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((128, 64)),
+    torchvision.transforms.Resize((256, 256)),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                      [0.229, 0.224, 0.225])
