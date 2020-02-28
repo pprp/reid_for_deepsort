@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
 parser.add_argument("--no-cuda", action="store_true")
 parser.add_argument("--gpu-id", default=0, type=int)
-parser.add_argument("--lr", default=0.1, type=float)
+parser.add_argument("--lr", default=0.01, type=float)
 parser.add_argument("--interval", '-i', default=20, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
 args = parser.parse_args()
@@ -28,8 +28,9 @@ if torch.cuda.is_available() and not args.no_cuda:
 
 # data loading
 root = args.data_dir
-train_dir = os.path.join(root, "train")
-test_dir = os.path.join(root, "val")
+train_dir = os.path.join(root, "train1")
+test_dir = os.path.join(root, "val1")
+
 transform_train = torchvision.transforms.Compose([
     torchvision.transforms.RandomCrop((256, 256), padding=4),
     torchvision.transforms.RandomHorizontalFlip(),
@@ -49,13 +50,14 @@ trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
                                           shuffle=True)
 testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     test_dir, transform=transform_test),
-                                         batch_size=64,
+                                         batch_size=2,
                                          shuffle=True)
 num_classes = len(trainloader.dataset.classes)
 
 # net definition
 start_epoch = 0
-net = Net(num_classes=num_classes)
+net = osnet_x0_25(num_classes=num_classes)
+
 if args.resume:
     assert os.path.isfile(
         "./checkpoint/ckpt.t7"), "Error: no checkpoint file found!"
@@ -66,6 +68,7 @@ if args.resume:
     net.load_state_dict(net_dict)
     best_acc = checkpoint['acc']
     start_epoch = checkpoint['epoch']
+
 net.to(device)
 
 # loss and optimizer
@@ -114,7 +117,6 @@ def train(epoch):
                         100. * correct / total))
             training_loss = 0.
             start = time.time()
-
     return train_loss / len(trainloader), 1. - correct / total
 
 
@@ -196,11 +198,11 @@ def lr_decay():
 
 
 def main():
-    for epoch in range(start_epoch, start_epoch + 40):
+    for epoch in range(start_epoch, start_epoch + 100):
         train_loss, train_err = train(epoch)
         test_loss, test_err = test(epoch)
         draw_curve(epoch, train_loss, train_err, test_loss, test_err)
-        if (epoch + 1) % 20 == 0:
+        if (epoch + 1) % 30 == 0:
             lr_decay()
 
 

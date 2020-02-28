@@ -5,11 +5,11 @@ from os.path import join
 import random
 
 root_dir = "./data/reid"
-train_dir = "./data/train"
-val_dir = "./data/val"
+train_dir = "./data/train1"
+val_dir = "./data/val1"
 
-train_percent = 0.8
-val_percent = 0.2
+train_percent = 0.6
+val_percent = 0.4
 
 
 def mkdir_if_not_exist(dir):

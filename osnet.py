@@ -435,3 +435,15 @@ def osnet_ibn_x1_0(num_classes=1000, loss='softmax', **kwargs):
                  loss=loss,
                  IN=True,
                  **kwargs)
+
+
+def osnet_ibn_small(num_classes=1000, loss='softmax', **kwargs):
+    # standard size (width x1.0) + IBN layer
+    # Ref: Pan et al. Two at Once: Enhancing Learning and Generalization Capacities via IBN-Net. ECCV, 2018.
+    return OSNet(num_classes,
+                 blocks=[OSBlock, OSBlock, OSBlock],
+                 layers=[2, 2, 2],
+                 channels=[16, 32, 64, 96],
+                 loss=loss,
+                 IN=True,
+                 **kwargs)
