@@ -64,10 +64,13 @@ class Net(nn.Module):
         self.layer2 = make_layers(32,64,2,True)
         # 64 32 16
         self.layer3 = make_layers(64,128,2,True)
+
+        self.gap = nn.AdaptiveAvgPool2d(1)
+
         # 128 16 8
         self.dense = nn.Sequential(
-            nn.Dropout(p=0.6),
-            nn.Linear(128*16*8, 128),
+            nn.Dropout(p=0.5),
+            nn.Linear(128, 128),
             nn.BatchNorm1d(128),
             nn.ELU(inplace=True)
         )
@@ -79,17 +82,19 @@ class Net(nn.Module):
         )
     
     def forward(self, x):
+        bs = x.shape[0]
         x = self.conv(x)
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
+        x = self.gap(x).view(bs, -1)
 
-        x = x.view(x.size(0),-1)
         if self.reid:
             x = self.dense[0](x)
             x = self.dense[1](x)
             x = x.div(x.norm(p=2,dim=1,keepdim=True))
             return x
+
         x = self.dense(x)
         # B x 128
         # classifier

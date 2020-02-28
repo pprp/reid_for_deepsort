@@ -256,6 +256,7 @@ class OSNet(nn.Module):
                  feature_dim=512,
                  loss='softmax',
                  IN=False,
+                 reid=False,
                  **kwargs):
         super(OSNet, self).__init__()
         num_blocks = len(blocks)
@@ -373,6 +374,9 @@ class OSNet(nn.Module):
             v = self.fc(v)
         if not self.training:
             return v
+        if self.reid == True:
+            x = x.div(x.norm(p=2, dim=1, keepdim=True))
+            return x
         y = self.classifier(v)
         if self.loss == 'softmax':
             return y
@@ -437,7 +441,7 @@ def osnet_ibn_x1_0(num_classes=1000, loss='softmax', **kwargs):
                  **kwargs)
 
 
-def osnet_ibn_small(num_classes=1000, loss='softmax', **kwargs):
+def osnet_small(num_classes=1000, loss='softmax', **kwargs):
     # standard size (width x1.0) + IBN layer
     # Ref: Pan et al. Two at Once: Enhancing Learning and Generalization Capacities via IBN-Net. ECCV, 2018.
     return OSNet(num_classes,
@@ -445,5 +449,4 @@ def osnet_ibn_small(num_classes=1000, loss='softmax', **kwargs):
                  layers=[2, 2, 2],
                  channels=[16, 32, 64, 96],
                  loss=loss,
-                 IN=True,
                  **kwargs)

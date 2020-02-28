@@ -8,15 +8,16 @@ import torch
 import torch.backends.cudnn as cudnn
 import torchvision
 
-from model import Net
-from osnet import osnet_x0_25
+# from model import Net
+# from osnet import osnet_x0_25, osnet_small
+from original_model import Net
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
 parser.add_argument("--no-cuda", action="store_true")
 parser.add_argument("--gpu-id", default=0, type=int)
 parser.add_argument("--lr", default=0.01, type=float)
-parser.add_argument("--interval", '-i', default=20, type=int)
+parser.add_argument("--interval", '-i', default=10, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
 args = parser.parse_args()
 
@@ -28,8 +29,8 @@ if torch.cuda.is_available() and not args.no_cuda:
 
 # data loading
 root = args.data_dir
-train_dir = os.path.join(root, "train1")
-test_dir = os.path.join(root, "val1")
+train_dir = os.path.join(root, "train")
+test_dir = os.path.join(root, "val")
 
 transform_train = torchvision.transforms.Compose([
     torchvision.transforms.RandomCrop((256, 256), padding=4),
@@ -56,13 +57,13 @@ num_classes = len(trainloader.dataset.classes)
 
 # net definition
 start_epoch = 0
-net = osnet_x0_25(num_classes=num_classes)
+net = Net(num_classes=num_classes, reid=True)
 
 if args.resume:
     assert os.path.isfile(
-        "./checkpoint/ckpt.t7"), "Error: no checkpoint file found!"
-    print('Loading from checkpoint/ckpt.t7')
-    checkpoint = torch.load("./checkpoint/ckpt.t7")
+        "./checkpoint/best.pt"), "Error: no checkpoint file found!"
+    print('Loading from checkpoint/best.pt')
+    checkpoint = torch.load("./checkpoint/best.pt")
     # import ipdb; ipdb.set_trace()
     net_dict = checkpoint['net_dict']
     net.load_state_dict(net_dict)
@@ -82,7 +83,7 @@ best_acc = 0.
 
 # train function for each epoch
 def train(epoch):
-    print("\nEpoch : %d" % (epoch + 1))
+    print('='*30,"Training","="*30)
     net.train()
     training_loss = 0.
     train_loss = 0.
@@ -111,8 +112,8 @@ def train(epoch):
         if (idx + 1) % interval == 0:
             end = time.time()
             print(
-                "[progress:{:.1f}%]time:{:.2f}s Loss:{:.5f} Correct:{}/{} Acc:{:.3f}%"
-                .format(100. * (idx + 1) / len(trainloader), end - start,
+                "[epoch:{:d}]\t time:{:.2f}s\t Loss:{:.5f}\t Correct:{}/{}\t Acc:{:.3f}%"
+                .format(epoch, end - start,
                         training_loss / interval, correct, total,
                         100. * correct / total))
             training_loss = 0.
@@ -137,19 +138,19 @@ def test(epoch):
             correct += outputs.max(dim=1)[1].eq(labels).sum().item()
             total += labels.size(0)
 
-        print("Testing ...")
+        print('='*30,"Testing","="*30)
+
         end = time.time()
         print(
-            "[progress:{:.1f}%]time:{:.2f}s Loss:{:.5f} Correct:{}/{} Acc:{:.3f}%"
-            .format(100. * (idx + 1) / len(testloader), end - start,
-                    test_loss / len(testloader), correct, total,
-                    100. * correct / total))
+            "[epoch:{:d}]\t time:{:.2f}s\t Loss:{:.5f}\t Correct:{}/{}\t Acc:{:.3f}%"
+            .format(epoch, end - start, test_loss / len(testloader), correct,
+                    total, 100. * correct / total))
 
     # saving checkpoint
     acc = 100. * correct / total
     if acc > best_acc:
         best_acc = acc
-        print("Saving parameters to checkpoint/ckpt.t7")
+        print("Saving parameters to checkpoint/best.pt")
         checkpoint = {
             'net_dict': net.state_dict(),
             'acc': acc,
@@ -157,7 +158,7 @@ def test(epoch):
         }
         if not os.path.isdir('checkpoint'):
             os.mkdir('checkpoint')
-        torch.save(checkpoint, './checkpoint/ckpt.t7')
+        torch.save(checkpoint, './checkpoint/best.pt')
 
     return test_loss / len(testloader), 1. - correct / total
 
