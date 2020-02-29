@@ -47,8 +47,8 @@ transform_test = torchvision.transforms.Compose([
 ])
 trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     train_dir, transform=transform_train),
-                                          batch_size=64,
-                                          shuffle=True)
+    batch_size=64,
+    shuffle=True)
 testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     test_dir, transform=transform_test),
                                          batch_size=2,
