@@ -4,7 +4,7 @@ __all__ = [
 
 from torch import nn
 from torch.nn import functional as F
-
+from torch.nn import init
 
 ##########
 # Basic layers
@@ -140,7 +140,7 @@ class ChannelGate(nn.Module):
                  num_gates=None,
                  return_gates=False,
                  gate_activation='sigmoid',
-                 reduction=16,
+                 reduction=4,
                  layer_norm=False):
         super(ChannelGate, self).__init__()
         if num_gates is None:
@@ -239,9 +239,66 @@ class OSBlock(nn.Module):
         return F.relu(out)
 
 
+def weights_init_kaiming(m):
+    classname = m.__class__.__name__
+    # print(classname)
+    if classname.find('Conv') != -1:
+        init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+    elif classname.find('Linear') != -1:
+        init.kaiming_normal_(m.weight.data, a=0, mode='fan_out')
+        init.constant_(m.bias.data, 0.0)
+    elif classname.find('BatchNorm1d') != -1:
+        init.normal_(m.weight.data, 1.0, 0.02)
+        init.constant_(m.bias.data, 0.0)
+
+
+def weights_init_classifier(m):
+    classname = m.__class__.__name__
+    if classname.find('Linear') != -1:
+        init.normal_(m.weight.data, std=0.001)
+        init.constant_(m.bias.data, 0.0)
+
+
+class ClassBlock(nn.Module):
+    def __init__(self,
+                 input_dim,
+                 class_num,
+                 dropout=False,
+                 relu=False,
+                 num_bottleneck=512):
+        super(ClassBlock, self).__init__()
+        add_block = []
+        add_block += [nn.BatchNorm1d(input_dim)]
+        # add_block += [nn.Linear(input_dim, num_bottleneck)]
+        # num_bottleneck = input_dim
+
+        if relu:
+            add_block += [nn.LeakyReLU(0.1)]
+        if dropout:
+            add_block += [nn.Dropout(p=0.5)]
+
+        add_block = nn.Sequential(*add_block)
+        add_block.apply(weights_init_kaiming)
+
+        classifier = []
+        classifier += [nn.Linear(input_dim, class_num)]
+        classifier = nn.Sequential(*classifier)
+        classifier.apply(weights_init_classifier)
+
+        self.add_block = add_block
+        self.classifier = classifier
+
+    def forward(self, x):
+        ft = self.add_block(x)
+        f_norm = ft.norm(p=2, dim=1, keepdim=True) + 1e-8
+        ft = ft.div(f_norm)
+        out = self.classifier(ft)
+        return out, ft
+
 ##########
 # Network architecture
 ##########
+
 class OSNet(nn.Module):
     """Omni-Scale Network.
     Reference:
@@ -265,6 +322,7 @@ class OSNet(nn.Module):
         self.loss = loss
 
         # convolutional backbone
+        # conv+bn+relu
         self.conv1 = ConvLayer(3, channels[0], 7, stride=2, padding=3, IN=IN)
         self.maxpool = nn.MaxPool2d(3, stride=2, padding=1)
         self.conv2 = self._make_layer(blocks[0],
@@ -285,12 +343,13 @@ class OSNet(nn.Module):
                                       reduce_spatial_size=False)
         self.conv5 = Conv1x1(channels[3], channels[3])
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
-        # fully connected layer
-        self.fc = self._construct_fc_layer(feature_dim,
-                                           channels[3],
-                                           dropout_p=None)
-        # identity classification layer
-        self.classifier = nn.Linear(self.feature_dim, num_classes)
+
+        self.classifier = ClassBlock(512,
+                                     num_classes,
+                                     dropout=False,
+                                     relu=False)
+        #nn.Linear(self.feature_dim, num_classes)
+        self.reid = reid
 
         self._init_params()
 
@@ -368,22 +427,26 @@ class OSNet(nn.Module):
 
     def forward(self, x):
         x = self.featuremaps(x)
-        v = self.global_avgpool(x)
-        v = v.view(v.size(0), -1)
-        if self.fc is not None:
-            v = self.fc(v)
-        if not self.training:
-            return v
-        if self.reid == True:
-            x = x.div(x.norm(p=2, dim=1, keepdim=True))
-            return x
-        y = self.classifier(v)
-        if self.loss == 'softmax':
-            return y
-        elif self.loss == 'triplet':
-            return y, v
-        else:
-            raise KeyError("Unsupported loss: {}".format(self.loss))
+        x = self.global_avgpool(x)
+        x = x.view(x.size(0), -1)
+        out, ft = self.classifier(x)
+        return out, ft
+        # print("v:", v.shape)
+        # if self.fc is not None:
+        #     v = self.fc(v)
+        # if not self.training:
+        # return v
+        # if self.reid == True:
+        #     x = x.div(x.norm(p=2, dim=1, keepdim=True))
+        #     return x
+
+        # y = self.classifier(v)
+        # if self.loss == 'softmax':
+        # return y
+        # elif self.loss == 'triplet':
+        # return y, v
+        # else:
+        # raise KeyError("Unsupported loss: {}".format(self.loss))
 
 
 ##########
@@ -446,7 +509,7 @@ def osnet_small(num_classes=1000, loss='softmax', **kwargs):
     # Ref: Pan et al. Two at Once: Enhancing Learning and Generalization Capacities via IBN-Net. ECCV, 2018.
     return OSNet(num_classes,
                  blocks=[OSBlock, OSBlock, OSBlock],
-                 layers=[2, 2, 2],
-                 channels=[16, 32, 64, 96],
+                 layers=[1, 1, 1],
+                 channels=[16, 20, 32, 40],
                  loss=loss,
                  **kwargs)

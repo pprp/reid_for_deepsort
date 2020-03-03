@@ -2,22 +2,22 @@ import argparse
 import os
 import time
 
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
 import torch.backends.cudnn as cudnn
 import torchvision
+from torchvision.models import resnet18
 
-# from model import Net
-# from osnet import osnet_x0_25, osnet_small
 from original_model import Net
+from osnet import *
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
 parser.add_argument("--no-cuda", action="store_true")
-parser.add_argument("--gpu-id", default=0, type=int)
+parser.add_argument("--gpu-id", default=1, type=int)
 parser.add_argument("--lr", default=0.01, type=float)
-parser.add_argument("--interval", '-i', default=10, type=int)
+parser.add_argument("--interval", '-i', default=30, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
 args = parser.parse_args()
 
@@ -47,17 +47,19 @@ transform_test = torchvision.transforms.Compose([
 ])
 trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     train_dir, transform=transform_train),
-    batch_size=64,
-    shuffle=True)
+                                          batch_size=32,
+                                          shuffle=True)
+
 testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     test_dir, transform=transform_test),
-                                         batch_size=2,
+                                         batch_size=32,
                                          shuffle=True)
+
 num_classes = len(trainloader.dataset.classes)
 
 # net definition
 start_epoch = 0
-net = Net(num_classes=num_classes, reid=True)
+net = osnet_x1_0(num_classes=num_classes)
 
 if args.resume:
     assert os.path.isfile(
@@ -83,8 +85,9 @@ best_acc = 0.
 
 # train function for each epoch
 def train(epoch):
-    print('='*30,"Training","="*30)
+    print('=' * 30, "Training", "=" * 30)
     net.train()
+    # net.aux_logits=False
     training_loss = 0.
     train_loss = 0.
     correct = 0
@@ -94,7 +97,7 @@ def train(epoch):
     for idx, (inputs, labels) in enumerate(trainloader):
         # forward
         inputs, labels = inputs.to(device), labels.to(device)
-        outputs = net(inputs)
+        outputs, ft = net(inputs)
         loss = criterion(outputs, labels)
 
         # backward
@@ -113,9 +116,8 @@ def train(epoch):
             end = time.time()
             print(
                 "[epoch:{:d}]\t time:{:.2f}s\t Loss:{:.5f}\t Correct:{}/{}\t Acc:{:.3f}%"
-                .format(epoch, end - start,
-                        training_loss / interval, correct, total,
-                        100. * correct / total))
+                .format(epoch, end - start, training_loss / interval, correct,
+                        total, 100. * correct / total))
             training_loss = 0.
             start = time.time()
     return train_loss / len(trainloader), 1. - correct / total
@@ -131,14 +133,14 @@ def test(epoch):
     with torch.no_grad():
         for idx, (inputs, labels) in enumerate(testloader):
             inputs, labels = inputs.to(device), labels.to(device)
-            outputs = net(inputs)
+            outputs, features = net(inputs)
             loss = criterion(outputs, labels)
 
             test_loss += loss.item()
             correct += outputs.max(dim=1)[1].eq(labels).sum().item()
             total += labels.size(0)
 
-        print('='*30,"Testing","="*30)
+        print('=' * 30, "Testing", "=" * 30)
 
         end = time.time()
         print(
