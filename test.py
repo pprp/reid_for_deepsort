@@ -6,7 +6,6 @@ import argparse
 import os
 
 from model import Net
-from osnet import *
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
@@ -25,7 +24,7 @@ root = args.data_dir
 query_dir = os.path.join(root, "query")
 gallery_dir = os.path.join(root, "gallery")
 transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((256, 256)),
+    torchvision.transforms.Resize((128, 64)),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                      [0.229, 0.224, 0.225])
@@ -33,20 +32,18 @@ transform = torchvision.transforms.Compose([
 queryloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     query_dir, transform=transform),
                                           batch_size=64,
-                                          shuffle=True)
+                                          shuffle=False)
 galleryloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     gallery_dir, transform=transform),
                                             batch_size=64,
-                                            shuffle=True)
-
-num_classes = len(queryloader.dataset.classes)
+                                            shuffle=False)
 
 # net definition
-net = osnet_x1_0(num_classes=num_classes,reid=True)
+net = Net(reid=True)
 assert os.path.isfile(
-    "./checkpoint/best.pt"), "Error: no checkpoint file found!"
-print('Loading from checkpoint/best.pt')
-checkpoint = torch.load("./checkpoint/best.pt")
+    "./checkpoint/ckpt.t7"), "Error: no checkpoint file found!"
+print('Loading from checkpoint/ckpt.t7')
+checkpoint = torch.load("./checkpoint/ckpt.t7")
 net_dict = checkpoint['net_dict']
 net.load_state_dict(net_dict)
 net.eval()
@@ -60,7 +57,6 @@ gallery_labels = torch.tensor([]).long()
 
 with torch.no_grad():
     for idx, (inputs, labels) in enumerate(queryloader):
-        print(idx, labels)
         inputs = inputs.to(device)
         features = net(inputs).cpu()
         query_features = torch.cat((query_features, features), dim=0)
@@ -76,9 +72,9 @@ gallery_labels -= 2
 
 # save features
 features = {
-    "qf": query_features.view(query_features.size()[0],-1),
+    "qf": query_features,
     "ql": query_labels,
-    "gf": gallery_features.view(gallery_features.size()[0],-1),
+    "gf": gallery_features,
     "gl": gallery_labels
 }
 torch.save(features, "features.pth")

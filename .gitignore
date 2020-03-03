@@ -2,3 +2,4 @@
 *.jpg
 checkpoint/ckpt.t7
 *.json
+data/videoAndLabel/cutout8.mp4
