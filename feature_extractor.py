@@ -3,22 +3,23 @@ import torchvision.transforms as transforms
 import numpy as np
 import cv2
 
-from .model import Net
+from model import Net
+from osnet import osnet_small
 
 class Extractor(object):
     def __init__(self, model_path, use_cuda=True):
-        self.net = Net(reid=True)
+        self.net = osnet_small(96)
         self.device = "cuda" if torch.cuda.is_available() and use_cuda else "cpu"
         state_dict = torch.load(model_path)['net_dict']
         self.net.load_state_dict(state_dict)
         print("Loading weights from {}... Done!".format(model_path))
         self.net.to(self.device)
-        self.size = (64, 128)
+        self.size = (256, 256)
         self.norm = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
-        
+
 
 
     def _preprocess(self, im_crops):
@@ -41,13 +42,12 @@ class Extractor(object):
         im_batch = self._preprocess(im_crops)
         with torch.no_grad():
             im_batch = im_batch.to(self.device)
-            features = self.net(im_batch)
+            output, features = self.net(im_batch)
         return features.cpu().numpy()
 
 
 if __name__ == '__main__':
-    img = cv2.imread("demo.jpg")[:,:,(2,1,0)]
-    extr = Extractor("checkpoint/ckpt.t7")
-    feature = extr(img)
+    img = cv2.imread("data/reid/cutout13_0/cutout13_0_0.jpg")[:,:,(2,1,0)]
+    extr = Extractor("checkpoint/best.pt")
+    feature = extr([img, img])
     print(feature.shape)
-

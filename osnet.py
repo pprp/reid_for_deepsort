@@ -140,7 +140,7 @@ class ChannelGate(nn.Module):
                  num_gates=None,
                  return_gates=False,
                  gate_activation='sigmoid',
-                 reduction=16,
+                 reduction=4,
                  layer_norm=False):
         super(ChannelGate, self).__init__()
         if num_gates is None:
@@ -372,18 +372,9 @@ class OSNet(nn.Module):
         v = v.view(v.size(0), -1)
         if self.fc is not None:
             v = self.fc(v)
-        if not self.training:
-            return v
-        if self.reid == True:
-            x = x.div(x.norm(p=2, dim=1, keepdim=True))
-            return x
+        v = v.div(v.norm(p=2, dim=1, keepdim=True))
         y = self.classifier(v)
-        if self.loss == 'softmax':
-            return y
-        elif self.loss == 'triplet':
-            return y, v
-        else:
-            raise KeyError("Unsupported loss: {}".format(self.loss))
+        return y, v
 
 
 ##########

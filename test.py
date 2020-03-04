@@ -24,7 +24,7 @@ root = args.data_dir
 query_dir = os.path.join(root, "query")
 gallery_dir = os.path.join(root, "gallery")
 transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((128, 64)),
+    torchvision.transforms.Resize((256, 256)),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                      [0.229, 0.224, 0.225])

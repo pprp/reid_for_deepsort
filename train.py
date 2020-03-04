@@ -10,13 +10,14 @@ import torchvision
 
 # from model import Net
 # from osnet import osnet_x0_25, osnet_small
-from original_model import Net
+# from original_model import Net
+from osnet import osnet_small
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
 parser.add_argument("--no-cuda", action="store_true")
 parser.add_argument("--gpu-id", default=0, type=int)
-parser.add_argument("--lr", default=0.01, type=float)
+parser.add_argument("--lr", default=0.1, type=float)
 parser.add_argument("--interval", '-i', default=10, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
 args = parser.parse_args()
@@ -57,7 +58,7 @@ num_classes = len(trainloader.dataset.classes)
 
 # net definition
 start_epoch = 0
-net = Net(num_classes=num_classes, reid=True)
+net = osnet_small(num_classes=num_classes)
 
 if args.resume:
     assert os.path.isfile(
@@ -94,7 +95,7 @@ def train(epoch):
     for idx, (inputs, labels) in enumerate(trainloader):
         # forward
         inputs, labels = inputs.to(device), labels.to(device)
-        outputs = net(inputs)
+        outputs, feature = net(inputs)
         loss = criterion(outputs, labels)
 
         # backward
@@ -131,7 +132,7 @@ def test(epoch):
     with torch.no_grad():
         for idx, (inputs, labels) in enumerate(testloader):
             inputs, labels = inputs.to(device), labels.to(device)
-            outputs = net(inputs)
+            outputs, features = net(inputs)
             loss = criterion(outputs, labels)
 
             test_loss += loss.item()
@@ -198,14 +199,10 @@ def lr_decay():
         print("Learning rate adjusted to {}".format(lr))
 
 
-def main():
-    for epoch in range(start_epoch, start_epoch + 200):
+if __name__ == '__main__':
+    for epoch in range(start_epoch, start_epoch + 100):
         train_loss, train_err = train(epoch)
         test_loss, test_err = test(epoch)
         draw_curve(epoch, train_loss, train_err, test_loss, test_err)
         if (epoch + 1) % 30 == 0:
             lr_decay()
-
-
-if __name__ == '__main__':
-    main()
