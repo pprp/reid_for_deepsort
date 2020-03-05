@@ -5,22 +5,24 @@ import cv2
 
 from model import Net
 from osnet import osnet_small
+from train import input_size
+
 
 class Extractor(object):
     def __init__(self, model_path, use_cuda=True):
-        self.net = osnet_small(96)
-        self.device = "cuda" if torch.cuda.is_available() and use_cuda else "cpu"
+        self.net = osnet_small(96, reid=True)
+        #Net(96)#osnet_small(96,reid=True)#osnet_small(96)
+        self.device = "cuda" if torch.cuda.is_available(
+        ) and use_cuda else "cpu"
         state_dict = torch.load(model_path)['net_dict']
         self.net.load_state_dict(state_dict)
         print("Loading weights from {}... Done!".format(model_path))
         self.net.to(self.device)
-        self.size = (256, 256)
+        self.size = input_size
         self.norm = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
         ])
-
-
 
     def _preprocess(self, im_crops):
         """
@@ -32,22 +34,25 @@ class Extractor(object):
             4. normalize
         """
         def _resize(im, size):
-            return cv2.resize(im.astype(np.float32)/255., size)
+            return cv2.resize(im.astype(np.float32) / 255., size)
 
-        im_batch = torch.cat([self.norm(_resize(im, self.size)).unsqueeze(0) for im in im_crops], dim=0).float()
+        im_batch = torch.cat([
+            self.norm(_resize(im, self.size)).unsqueeze(0) for im in im_crops
+        ],
+                             dim=0).float()
         return im_batch
-
 
     def __call__(self, im_crops):
         im_batch = self._preprocess(im_crops)
         with torch.no_grad():
             im_batch = im_batch.to(self.device)
             output, features = self.net(im_batch)
+        print(output, features)
         return features.cpu().numpy()
 
 
 if __name__ == '__main__':
-    img = cv2.imread("data/reid/cutout13_0/cutout13_0_0.jpg")[:,:,(2,1,0)]
+    img = cv2.imread("data/reid/cutout13_0/cutout13_0_0.jpg")[:, :, (2, 1, 0)]
     extr = Extractor("checkpoint/best.pt")
     feature = extr([img, img])
-    print(feature.shape)
+    

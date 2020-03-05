@@ -7,11 +7,14 @@ import matplotlib.pyplot as plt
 import torch
 import torch.backends.cudnn as cudnn
 import torchvision
+import torch.optim as optim
 
-# from model import Net
-# from osnet import osnet_x0_25, osnet_small
-# from original_model import Net
+from center_loss import CenterLoss
+
 from osnet import osnet_small
+from model import Net
+
+input_size = (128, 128)
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
@@ -34,26 +37,27 @@ train_dir = os.path.join(root, "train")
 test_dir = os.path.join(root, "val")
 
 transform_train = torchvision.transforms.Compose([
-    torchvision.transforms.RandomCrop((256, 256), padding=4),
+    torchvision.transforms.RandomCrop(input_size, padding=4),
     torchvision.transforms.RandomHorizontalFlip(),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                      [0.229, 0.224, 0.225])
 ])
 transform_test = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((256, 256)),
+    torchvision.transforms.Resize(input_size),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                      [0.229, 0.224, 0.225])
 ])
 trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     train_dir, transform=transform_train),
-    batch_size=64,
-    shuffle=True)
+                                          batch_size=64,
+                                          shuffle=True)
 testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     test_dir, transform=transform_test),
-                                         batch_size=2,
+                                         batch_size=64,
                                          shuffle=True)
+
 num_classes = len(trainloader.dataset.classes)
 
 # net definition
@@ -74,17 +78,20 @@ if args.resume:
 net.to(device)
 
 # loss and optimizer
-criterion = torch.nn.CrossEntropyLoss()
+criterion = torch.nn.CrossEntropyLoss()  #CenterLoss(num_classes=num_classes)
 optimizer = torch.optim.SGD(net.parameters(),
                             args.lr,
                             momentum=0.9,
                             weight_decay=5e-4)
+scheduler = optim.lr_scheduler.StepLR(  # best lr 1e-3
+    optimizer, step_size=20, gamma=0.5)
+
 best_acc = 0.
 
 
 # train function for each epoch
 def train(epoch):
-    print('='*30,"Training","="*30)
+    print('=' * 30, "Training", "=" * 30)
     net.train()
     training_loss = 0.
     train_loss = 0.
@@ -95,7 +102,7 @@ def train(epoch):
     for idx, (inputs, labels) in enumerate(trainloader):
         # forward
         inputs, labels = inputs.to(device), labels.to(device)
-        outputs, feature = net(inputs)
+        outputs = net(inputs)
         loss = criterion(outputs, labels)
 
         # backward
@@ -113,10 +120,9 @@ def train(epoch):
         if (idx + 1) % interval == 0:
             end = time.time()
             print(
-                "[epoch:{:d}]\t time:{:.2f}s\t Loss:{:.5f}\t Correct:{}/{}\t Acc:{:.3f}%"
-                .format(epoch, end - start,
-                        training_loss / interval, correct, total,
-                        100. * correct / total))
+                "epoch:{:d}/{:d}\t time:{:.2f}s\t Loss:{:.5f}\t Correct:{}/{}\t Acc:{:.3f}%"
+                .format(epoch, idx, end - start, training_loss / interval,
+                        correct, total, 100. * correct / total))
             training_loss = 0.
             start = time.time()
     return train_loss / len(trainloader), 1. - correct / total
@@ -132,23 +138,25 @@ def test(epoch):
     with torch.no_grad():
         for idx, (inputs, labels) in enumerate(testloader):
             inputs, labels = inputs.to(device), labels.to(device)
-            outputs, features = net(inputs)
+            outputs = net(inputs)
             loss = criterion(outputs, labels)
 
             test_loss += loss.item()
             correct += outputs.max(dim=1)[1].eq(labels).sum().item()
             total += labels.size(0)
 
-        print('='*30,"Testing","="*30)
+        print('=' * 30, "Testing", "=" * 30)
 
         end = time.time()
         print(
-            "[epoch:{:d}]\t time:{:.2f}s\t Loss:{:.5f}\t Correct:{}/{}\t Acc:{:.3f}%"
+            "epoch:{:d}\t time:{:.2f}s\t Loss:{:.5f}\t Correct:{}/{}\t Acc:{:.3f}%"
             .format(epoch, end - start, test_loss / len(testloader), correct,
                     total, 100. * correct / total))
 
     # saving checkpoint
     acc = 100. * correct / total
+    if not os.path.isdir('checkpoint'):
+        os.mkdir('checkpoint')
     if acc > best_acc:
         best_acc = acc
         print("Saving parameters to checkpoint/best.pt")
@@ -157,9 +165,15 @@ def test(epoch):
             'acc': acc,
             'epoch': epoch,
         }
-        if not os.path.isdir('checkpoint'):
-            os.mkdir('checkpoint')
         torch.save(checkpoint, './checkpoint/best.pt')
+        torch.save(checkpoint, './checkpoint/last.pt')
+    else:
+        checkpoint = {
+            'net_dict': net.state_dict(),
+            'acc': acc,
+            'epoch': epoch,
+        }
+        torch.save(checkpoint, './checkpoint/last.pt')
 
     return test_loss / len(testloader), 1. - correct / total
 
@@ -191,18 +205,17 @@ def draw_curve(epoch, train_loss, train_err, test_loss, test_err):
 
 
 # lr decay
-def lr_decay():
-    global optimizer
-    for params in optimizer.param_groups:
-        params['lr'] *= 0.1
-        lr = params['lr']
-        print("Learning rate adjusted to {}".format(lr))
-
+# def lr_decay():
+#     global optimizer
+#     for params in optimizer.param_groups:
+#         params['lr'] *= 0.1
+#         lr = params['lr']
+#         print("Learning rate adjusted to {}".format(lr))
 
 if __name__ == '__main__':
-    for epoch in range(start_epoch, start_epoch + 100):
+    for epoch in range(start_epoch, start_epoch + 200):
         train_loss, train_err = train(epoch)
         test_loss, test_err = test(epoch)
         draw_curve(epoch, train_loss, train_err, test_loss, test_err)
-        if (epoch + 1) % 30 == 0:
-            lr_decay()
+        scheduler.step()
+        os.system("python eval.py")

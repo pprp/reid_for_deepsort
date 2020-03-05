@@ -253,7 +253,7 @@ class OSNet(nn.Module):
                  blocks,
                  layers,
                  channels,
-                 feature_dim=512,
+                 feature_dim=128,
                  loss='softmax',
                  IN=False,
                  reid=False,
@@ -285,12 +285,17 @@ class OSNet(nn.Module):
                                       reduce_spatial_size=False)
         self.conv5 = Conv1x1(channels[3], channels[3])
         self.global_avgpool = nn.AdaptiveAvgPool2d(1)
+        self.reid = reid
         # fully connected layer
-        self.fc = self._construct_fc_layer(feature_dim,
-                                           channels[3],
-                                           dropout_p=None)
+        # self.fc = self._construct_fc_layer(feature_dim,
+        #                                    channels[3],
+        #                                    dropout_p=None)
         # identity classification layer
-        self.classifier = nn.Linear(self.feature_dim, num_classes)
+        self.classifier = nn.Sequential(nn.Linear(channels[3], feature_dim),
+                                        # nn.BatchNorm1d(feature_dim),
+                                        nn.Dropout(0.5),
+                                        nn.ReLU(inplace=True), nn.Dropout(),
+                                        nn.Linear(feature_dim, num_classes))
 
         self._init_params()
 
@@ -368,13 +373,15 @@ class OSNet(nn.Module):
 
     def forward(self, x):
         x = self.featuremaps(x)
-        v = self.global_avgpool(x)
-        v = v.view(v.size(0), -1)
-        if self.fc is not None:
-            v = self.fc(v)
-        v = v.div(v.norm(p=2, dim=1, keepdim=True))
-        y = self.classifier(v)
-        return y, v
+        x = self.global_avgpool(x)
+        x = x.view(x.size(0), -1)
+
+        if self.reid:
+            x = x.div(x.norm(p=2, dim=1, keepdim=True))
+            return x
+        # x = x.div(x.norm(p=2, dim=1, keepdim=True))
+        x = self.classifier(x)
+        return x
 
 
 ##########
@@ -435,9 +442,10 @@ def osnet_ibn_x1_0(num_classes=1000, loss='softmax', **kwargs):
 def osnet_small(num_classes=1000, loss='softmax', **kwargs):
     # standard size (width x1.0) + IBN layer
     # Ref: Pan et al. Two at Once: Enhancing Learning and Generalization Capacities via IBN-Net. ECCV, 2018.
+
     return OSNet(num_classes,
                  blocks=[OSBlock, OSBlock, OSBlock],
                  layers=[2, 2, 2],
-                 channels=[16, 32, 64, 96],
+                 channels=[64, 256, 384, 512],
                  loss=loss,
                  **kwargs)

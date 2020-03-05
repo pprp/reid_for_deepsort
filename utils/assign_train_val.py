@@ -5,8 +5,8 @@ from os.path import join
 import random
 
 root_dir = "./data/reid"
-train_dir = "./data/train1"
-val_dir = "./data/val1"
+train_dir = "./data/train2"
+val_dir = "./data/val2"
 
 train_percent = 0.6
 val_percent = 0.4

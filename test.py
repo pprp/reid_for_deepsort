@@ -6,6 +6,7 @@ import argparse
 import os
 
 from model import Net
+from train import input_size
 
 parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
@@ -24,7 +25,7 @@ root = args.data_dir
 query_dir = os.path.join(root, "query")
 gallery_dir = os.path.join(root, "gallery")
 transform = torchvision.transforms.Compose([
-    torchvision.transforms.Resize((256, 256)),
+    torchvision.transforms.Resize(input_size),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                      [0.229, 0.224, 0.225])

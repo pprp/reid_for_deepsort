@@ -10,11 +10,13 @@ from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
 
 from osnet import osnet_small
+from train import input_size
+from model import Net
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 test_transforms = transforms.Compose([
-    transforms.Resize((256, 256)),
+    transforms.Resize(input_size),
     transforms.ToTensor(),
     transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
 ])
@@ -25,13 +27,13 @@ query_datasets = datasets.ImageFolder(os.path.join("data", "query"),
                                       transform=test_transforms)
 
 gallery_dataloader = DataLoader(gallery_datasets,
-                                batch_size=32,
+                                batch_size=128,
                                 drop_last=False,
                                 shuffle=False,
                                 num_workers=1)
 
 query_dataloader = DataLoader(query_datasets,
-                              batch_size=32,
+                              batch_size=128,
                               drop_last=False,
                               shuffle=False,
                               num_workers=1)
@@ -64,7 +66,7 @@ def extract_features(model, dataloader):
                 img = fliplr(img)
             input_img = Variable(img.cuda())
             # print("=", input_img.shape)
-            _, feature = model(input_img)
+            feature = model(input_img)
             feature = feature.data.cpu()
             # print(ff.shape, feature.shape)
             ff = ff + feature
@@ -139,14 +141,14 @@ def evaluate(qf, ql, gf, gl):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('help')
-    parser.add_argument('--weight_path', type=str, default="./checkpints/best.pt")
+    parser.add_argument('--weight_path', type=str, default="./checkpints/last.pt")
     args = parser.parse_args()
 
-    model = osnet_small(len(class_names))
+    model = osnet_small(len(class_names), reid=True)
     assert os.path.isfile(
-    "./checkpoint/best.pt"), "Error: no checkpoint file found!"
-    print('Loading from checkpoint/best.pt')
-    checkpoint = torch.load("./checkpoint/best.pt")
+    "./checkpoint/last.pt"), "Error: no checkpoint file found!"
+    print('Loading from checkpoint/last.pt')
+    checkpoint = torch.load("./checkpoint/last.pt")
     net_dict = checkpoint['net_dict']
     model.load_state_dict(net_dict)
 
