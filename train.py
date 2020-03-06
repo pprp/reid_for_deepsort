@@ -82,7 +82,7 @@ criterion = torch.nn.CrossEntropyLoss()  #CenterLoss(num_classes=num_classes)
 optimizer = torch.optim.SGD(net.parameters(),
                             args.lr,
                             momentum=0.9,
-                            weight_decay=5e-4)
+                            weight_decay=5e-3)
 scheduler = optim.lr_scheduler.StepLR(  # best lr 1e-3
     optimizer, step_size=20, gamma=0.5)
 
