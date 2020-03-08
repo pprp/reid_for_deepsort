@@ -180,7 +180,7 @@ if __name__ == "__main__":
                 print(type(img))
 
                 if img is None or img.shape[0] == 0 or img.shape[1] == 0:
-                    print(specific_cow_name + "is empty")
+                    print(specific_cow_name + " is empty")
                     continue
 
                 # print(frame_id)

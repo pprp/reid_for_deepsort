@@ -9,9 +9,9 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
 
-from osnet import osnet_small
+from models.osnet import osnet_small
 from train import input_size
-from model import Net
+from models.model import Net
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
@@ -144,7 +144,7 @@ if __name__ == "__main__":
     parser.add_argument('--weight_path', type=str, default="./checkpints/last.pt")
     args = parser.parse_args()
 
-    model = osnet_small(len(class_names), reid=True)
+    model = Net(len(class_names), reid=True)
     assert os.path.isfile(
     "./checkpoint/last.pt"), "Error: no checkpoint file found!"
     print('Loading from checkpoint/last.pt')
@@ -182,5 +182,5 @@ if __name__ == "__main__":
     CMC = CMC.float()
     CMC = CMC / len(query_label)
 
-    print("Rank@1:%f|Rank@5:%f|Rank@10:%f|mAP:%f" %
+    print("\tRank@1:%f\n\tRank@5:%f\n\tRank@10:%f\n\tmAP:%f" %
           (CMC[0], CMC[4], CMC[9], ap / len(query_label)))

@@ -11,8 +11,8 @@ import torch.optim as optim
 
 from center_loss import CenterLoss
 
-from osnet import osnet_small
-from model import Net
+from models.osnet import osnet_small
+from models.model import Net
 
 input_size = (128, 128)
 
@@ -37,8 +37,9 @@ train_dir = os.path.join(root, "train")
 test_dir = os.path.join(root, "val")
 
 transform_train = torchvision.transforms.Compose([
-    torchvision.transforms.RandomCrop(input_size, padding=4),
-    torchvision.transforms.RandomHorizontalFlip(),
+    # torchvision.transforms.RandomCrop(input_size, padding=4),
+    # torchvision.transforms.RandomHorizontalFlip(),
+    torchvision.transforms.Resize(input_size),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.485, 0.456, 0.406],
                                      [0.229, 0.224, 0.225])
@@ -51,18 +52,20 @@ transform_test = torchvision.transforms.Compose([
 ])
 trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     train_dir, transform=transform_train),
-                                          batch_size=64,
-                                          shuffle=True)
+                                          batch_size=32,
+                                          shuffle=True,
+                                          num_workers=4)
 testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     test_dir, transform=transform_test),
-                                         batch_size=64,
-                                         shuffle=True)
+                                         batch_size=128,
+                                         shuffle=True,
+                                         num_workers=4)
 
 num_classes = len(trainloader.dataset.classes)
 
 # net definition
 start_epoch = 0
-net = osnet_small(num_classes=num_classes)
+net = Net(num_classes=num_classes)
 
 if args.resume:
     assert os.path.isfile(
@@ -78,13 +81,14 @@ if args.resume:
 net.to(device)
 
 # loss and optimizer
-criterion = torch.nn.CrossEntropyLoss()  #CenterLoss(num_classes=num_classes)
-optimizer = torch.optim.SGD(net.parameters(),
-                            args.lr,
-                            momentum=0.9,
-                            weight_decay=5e-3)
+criterion_model = torch.nn.CrossEntropyLoss(
+)  #CenterLoss(num_classes=num_classes)
+optimizer_model = torch.optim.SGD(net.parameters(), 0.001)  # from 3e-4 to 3e-5
+criterion_center = CenterLoss(num_classes=num_classes, feat_dim=num_classes)
+optimizer_center = optim.Adam(criterion_center.parameters(), lr=0.005)
+
 scheduler = optim.lr_scheduler.StepLR(  # best lr 1e-3
-    optimizer, step_size=20, gamma=0.5)
+    optimizer_model, step_size=20, gamma=0.1)
 
 best_acc = 0.
 
@@ -103,16 +107,23 @@ def train(epoch):
         # forward
         inputs, labels = inputs.to(device), labels.to(device)
         outputs = net(inputs)
-        loss = criterion(outputs, labels)
+
+        loss_center = criterion_center(outputs, labels)
+        loss_model = criterion_model(outputs, labels)
+
+        loss = 0.2 * loss_center + 0.8 * loss_model
 
         # backward
-        optimizer.zero_grad()
+        optimizer_center.zero_grad()
+        optimizer_model.zero_grad()
         loss.backward()
-        optimizer.step()
+        optimizer_model.step()
+        optimizer_center.step()
 
         # accumurating
         training_loss += loss.item()
         train_loss += loss.item()
+
         correct += outputs.max(dim=1)[1].eq(labels).sum().item()
         total += labels.size(0)
 
@@ -120,9 +131,10 @@ def train(epoch):
         if (idx + 1) % interval == 0:
             end = time.time()
             print(
-                "epoch:{:d}/{:d}\t time:{:.2f}s\t Loss:{:.5f}\t Correct:{}/{}\t Acc:{:.3f}%"
+                "epoch:{:d}|step:{:03d}|time:{:03.2f}s|Loss:{:03.5f}|center loss:{:03.4f}|model loss:{:03.4f}|Acc:{:02.3f}%"
                 .format(epoch, idx, end - start, training_loss / interval,
-                        correct, total, 100. * correct / total))
+                        0.2 * loss_center.item(), 0.8 * loss_model.item(),
+                        100. * correct / total))
             training_loss = 0.
             start = time.time()
     return train_loss / len(trainloader), 1. - correct / total
@@ -139,7 +151,7 @@ def test(epoch):
         for idx, (inputs, labels) in enumerate(testloader):
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = net(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion_model(outputs, labels)
 
             test_loss += loss.item()
             correct += outputs.max(dim=1)[1].eq(labels).sum().item()
@@ -157,6 +169,7 @@ def test(epoch):
     acc = 100. * correct / total
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
+
     if acc > best_acc:
         best_acc = acc
         print("Saving parameters to checkpoint/best.pt")
@@ -218,4 +231,5 @@ if __name__ == '__main__':
         test_loss, test_err = test(epoch)
         draw_curve(epoch, train_loss, train_err, test_loss, test_err)
         scheduler.step()
-        os.system("python eval.py")
+        if epoch % 10 == 0:
+            os.system("python eval.py")
