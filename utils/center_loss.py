@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
-
-
+nn.AdaptiveAvgPool2d
 class CenterLoss(nn.Module):
     """Center loss.
     
@@ -14,13 +13,14 @@ class CenterLoss(nn.Module):
     """
     def __init__(self, num_classes=10, feat_dim=2, use_gpu=True):
         super(CenterLoss, self).__init__()
+        self.device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
         self.num_classes = num_classes
         self.feat_dim = feat_dim
         self.use_gpu = use_gpu
 
         if self.use_gpu:
             self.centers = nn.Parameter(
-                torch.randn(self.num_classes, self.feat_dim).cuda())
+                torch.randn(self.num_classes, self.feat_dim).to(self.device))
         else:
             self.centers = nn.Parameter(
                 torch.randn(self.num_classes, self.feat_dim))
@@ -39,7 +39,7 @@ class CenterLoss(nn.Module):
 
         classes = torch.arange(self.num_classes).long()
         if self.use_gpu:
-            classes = classes.cuda()
+            classes = classes.to(self.device)
         labels = labels.unsqueeze(1).expand(batch_size, self.num_classes)
         mask = labels.eq(classes.expand(batch_size, self.num_classes))
 

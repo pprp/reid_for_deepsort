@@ -9,16 +9,13 @@ from torch.autograd import Variable
 from torch.utils.data import DataLoader, Dataset
 from torchvision import datasets, transforms
 
-from models.osnet import osnet_small
 from train import input_size
-from models.model import Net
-
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+from models import build_model
 
 test_transforms = transforms.Compose([
     transforms.Resize(input_size),
     transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
+    transforms.Normalize([0.3568, 0.3141, 0.2781], [0.1752, 0.1857, 0.1879])
 ])
 
 gallery_datasets = datasets.ImageFolder(os.path.join("data", "gallery"),
@@ -141,12 +138,15 @@ def evaluate(qf, ql, gf, gl):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser('help')
-    parser.add_argument('--weight_path', type=str, default="./checkpints/last.pt")
+    parser.add_argument('--weight_path',
+                        type=str,
+                        default="./checkpints/last.pt")
+    parser.add_argument("--model", type=str, default="mudeep")
     args = parser.parse_args()
 
-    model = Net(len(class_names), reid=True)
+    model = build_model(name=args.model, num_classes=len(class_names))
     assert os.path.isfile(
-    "./checkpoint/last.pt"), "Error: no checkpoint file found!"
+        "./checkpoint/last.pt"), "Error: no checkpoint file found!"
     print('Loading from checkpoint/last.pt')
     checkpoint = torch.load("./checkpoint/last.pt")
     net_dict = checkpoint['net_dict']
@@ -165,8 +165,6 @@ if __name__ == "__main__":
     if use_gpu:
         gallery_features = gallery_features.cuda()
         query_features = query_features.cuda()
-    # print(gallery_features.shape)
-    # print(query_features.shape)
 
     CMC = torch.IntTensor(len(gallery_label)).zero_()
     ap = 0.0

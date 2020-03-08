@@ -12,32 +12,15 @@ compute the statistics of Market1501, do
 $ python compute_mean_std.py $DATA market1501
 """
 import argparse
-
 import torch
-# import torchreid
 import torchvision
 
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('root', type=str)
-    parser.add_argument('sources', type=str)
+    parser.add_argument('--root', type=str)
+    parser.add_argument('--sources', type=str)
     args = parser.parse_args()
-
-    # datamanager = torchreid.data.ImageDataManager(
-    #     root=args.root,
-    #     sources=args.sources,
-    #     targets=None,
-    #     height=256,
-    #     width=128,
-    #     batch_size_train=100,
-    #     batch_size_test=100,
-    #     transforms=None,
-    #     norm_mean=[0., 0., 0.],
-    #     norm_std=[1., 1., 1.],
-    #     train_sampler='SequentialSampler'
-    # )
-    # train_loader = datamanager.train_loader
 
     train_loader = torch.utils.data.DataLoader(
         torchvision.datasets.ImageFolder("data/train",

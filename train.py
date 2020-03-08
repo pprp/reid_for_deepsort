@@ -9,10 +9,9 @@ import torch.backends.cudnn as cudnn
 import torchvision
 import torch.optim as optim
 
-from center_loss import CenterLoss
+from utils.center_loss import CenterLoss
 
-from models.osnet import osnet_small
-from models.model import Net
+from models import build_model
 
 input_size = (128, 128)
 
@@ -23,11 +22,13 @@ parser.add_argument("--gpu-id", default=0, type=int)
 parser.add_argument("--lr", default=0.1, type=float)
 parser.add_argument("--interval", '-i', default=10, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
+parser.add_argument('--model', type=str, default="mudeep")
 args = parser.parse_args()
 
 # device
 device = "cuda:{}".format(
     args.gpu_id) if torch.cuda.is_available() and not args.no_cuda else "cpu"
+
 if torch.cuda.is_available() and not args.no_cuda:
     cudnn.benchmark = True
 
@@ -37,18 +38,17 @@ train_dir = os.path.join(root, "train")
 test_dir = os.path.join(root, "val")
 
 transform_train = torchvision.transforms.Compose([
-    # torchvision.transforms.RandomCrop(input_size, padding=4),
-    # torchvision.transforms.RandomHorizontalFlip(),
+    torchvision.transforms.RandomHorizontalFlip(),
     torchvision.transforms.Resize(input_size),
     torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize([0.485, 0.456, 0.406],
-                                     [0.229, 0.224, 0.225])
+    torchvision.transforms.Normalize([0.3568, 0.3141, 0.2781],
+                                     [0.1752, 0.1857, 0.1879])
 ])
 transform_test = torchvision.transforms.Compose([
     torchvision.transforms.Resize(input_size),
     torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize([0.485, 0.456, 0.406],
-                                     [0.229, 0.224, 0.225])
+    torchvision.transforms.Normalize([0.3568, 0.3141, 0.2781],
+                                     [0.1752, 0.1857, 0.1879])
 ])
 trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     train_dir, transform=transform_train),
@@ -65,7 +65,7 @@ num_classes = len(trainloader.dataset.classes)
 
 # net definition
 start_epoch = 0
-net = Net(num_classes=num_classes)
+net = build_model(name=args.model,num_classes=num_classes)#Net(num_classes=num_classes)
 
 if args.resume:
     assert os.path.isfile(
@@ -169,24 +169,32 @@ def test(epoch):
     acc = 100. * correct / total
     if not os.path.isdir('checkpoint'):
         os.mkdir('checkpoint')
+        
+    save_path = os.path.join("checkpoint", args.model)
+    if not os.path.exists(save_path):
+        os.makedirs(save_path)
 
     if acc > best_acc:
         best_acc = acc
         print("Saving parameters to checkpoint/best.pt")
+        
         checkpoint = {
             'net_dict': net.state_dict(),
             'acc': acc,
             'epoch': epoch,
         }
-        torch.save(checkpoint, './checkpoint/best.pt')
-        torch.save(checkpoint, './checkpoint/last.pt')
+        torch.save(checkpoint,
+                   './checkpoint/%s/%s_best.pt' % (args.model, args.model))
+        torch.save(checkpoint,
+                   './checkpoint/%s/%s_last.pt' % (args.model, args.model))
     else:
         checkpoint = {
             'net_dict': net.state_dict(),
             'acc': acc,
             'epoch': epoch,
         }
-        torch.save(checkpoint, './checkpoint/last.pt')
+        torch.save(checkpoint,
+                   './checkpoint/%s/%s_last.pt' % (args.model, args.model))
 
     return test_loss / len(testloader), 1. - correct / total
 
@@ -217,19 +225,11 @@ def draw_curve(epoch, train_loss, train_err, test_loss, test_err):
     fig.savefig("train.jpg")
 
 
-# lr decay
-# def lr_decay():
-#     global optimizer
-#     for params in optimizer.param_groups:
-#         params['lr'] *= 0.1
-#         lr = params['lr']
-#         print("Learning rate adjusted to {}".format(lr))
-
 if __name__ == '__main__':
     for epoch in range(start_epoch, start_epoch + 200):
         train_loss, train_err = train(epoch)
         test_loss, test_err = test(epoch)
         draw_curve(epoch, train_loss, train_err, test_loss, test_err)
         scheduler.step()
-        if epoch % 10 == 0:
-            os.system("python eval.py")
+        # if epoch % 10 == 0:
+        # os.system("python eval.py")

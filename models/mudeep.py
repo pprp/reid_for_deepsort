@@ -174,7 +174,7 @@ class MuDeep(nn.Module):
         # maps are of shape (256, 16, 8). If input shape is changed,
         # the input dimension of this layer has to be changed accordingly.
         self.fc = nn.Sequential(
-            nn.Linear(256 * 16 * 8, 4096),
+            nn.Linear(256 * 8 * 8, 4096),
             nn.BatchNorm1d(4096),
             nn.ReLU(),
         )
