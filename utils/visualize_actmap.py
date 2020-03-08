@@ -12,13 +12,86 @@ import cv2
 import torch
 from torch.nn import functional as F
 
-import torchreid
-from torchreid.utils import (
-    check_isfile, mkdir_if_missing, load_pretrained_weights
-)
+from models import build_model
 
-IMAGENET_MEAN = [0.485, 0.456, 0.406]
-IMAGENET_STD = [0.229, 0.224, 0.225]
+def load_pretrained_weights(model, weight_path):
+    r"""Loads pretrianed weights to model.
+
+    Features::
+        - Incompatible layers (unmatched in name or size) will be ignored.
+        - Can automatically deal with keys containing "module.".
+
+    Args:
+        model (nn.Module): network model.
+        weight_path (str): path to pretrained weights.
+
+    Examples::
+        >>> from torchreid.utils import load_pretrained_weights
+        >>> weight_path = 'log/my_model/model-best.pth.tar'
+        >>> load_pretrained_weights(model, weight_path)
+    """
+    checkpoint = load_checkpoint(weight_path)
+    if 'state_dict' in checkpoint:
+        state_dict = checkpoint['state_dict']
+    else:
+        state_dict = checkpoint
+
+    model_dict = model.state_dict()
+    new_state_dict = OrderedDict()
+    matched_layers, discarded_layers = [], []
+
+    for k, v in state_dict.items():
+        if k.startswith('module.'):
+            k = k[7:]  # discard module.
+
+        if k in model_dict and model_dict[k].size() == v.size():
+            new_state_dict[k] = v
+            matched_layers.append(k)
+        else:
+            discarded_layers.append(k)
+
+    model_dict.update(new_state_dict)
+    model.load_state_dict(model_dict)
+
+    if len(matched_layers) == 0:
+        warnings.warn('The pretrained weights "{}" cannot be loaded, '
+                      'please check the key names manually '
+                      '(** ignored and continue **)'.format(weight_path))
+    else:
+        print('Successfully loaded pretrained weights from "{}"'.format(
+            weight_path))
+        if len(discarded_layers) > 0:
+            print('** The following layers are discarded '
+                  'due to unmatched keys or layer size: {}'.format(
+                      discarded_layers))
+
+
+def mkdir_if_missing(dirname):
+    """Creates dirname if it is missing."""
+    if not osp.exists(dirname):
+        try:
+            os.makedirs(dirname)
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+
+
+def check_isfile(fpath):
+    """Checks if the given path is a file.
+
+    Args:
+        fpath (str): file path.
+
+    Returns:
+       bool
+    """
+    isfile = osp.isfile(fpath)
+    if not isfile:
+        warnings.warn('No file found at "{}"'.format(fpath))
+    return isfile
+
+IMAGENET_MEAN = [0.3568, 0.3141, 0.2781]
+IMAGENET_STD = [0.1752, 0.1857, 0.1879]
 GRID_SPACING = 10
 
 
@@ -131,7 +204,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=str)
     parser.add_argument('-d', '--dataset', type=str, default='market1501')
-    parser.add_argument('-m', '--model', type=str, default='osnet_x1_0')
+    parser.add_argument('-m', '--model', type=str, default='mudeep')
     parser.add_argument('--weights', type=str)
     parser.add_argument('--save-dir', type=str, default='log')
     parser.add_argument('--height', type=int, default=256)
@@ -140,19 +213,12 @@ def main():
 
     use_gpu = torch.cuda.is_available()
 
-    datamanager = torchreid.data.ImageDataManager(
-        root=args.root,
-        sources=args.dataset,
-        height=args.height,
-        width=args.width,
-        batch_size_train=100,
-        batch_size_test=100,
-        transforms=None,
-        train_sampler='SequentialSampler'
-    )
-    test_loader = datamanager.test_loader
+    test_loader = torch.utils.data.DataLoader(
+        torchvision.datasets.ImageFolder(
+            "data/test", transform=torchvision.transforms.ToTensor()),
+        batch_size=6)
 
-    model = torchreid.models.build_model(
+    model = build_model(
         name=args.model,
         num_classes=datamanager.num_train_pids,
         use_gpu=use_gpu
