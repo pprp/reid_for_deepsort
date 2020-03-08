@@ -13,7 +13,9 @@ $ python compute_mean_std.py $DATA market1501
 """
 import argparse
 
-import torchreid
+import torch
+# import torchreid
+import torchvision
 
 
 def main():
@@ -22,27 +24,31 @@ def main():
     parser.add_argument('sources', type=str)
     args = parser.parse_args()
 
-    datamanager = torchreid.data.ImageDataManager(
-        root=args.root,
-        sources=args.sources,
-        targets=None,
-        height=256,
-        width=128,
-        batch_size_train=100,
-        batch_size_test=100,
-        transforms=None,
-        norm_mean=[0., 0., 0.],
-        norm_std=[1., 1., 1.],
-        train_sampler='SequentialSampler'
-    )
-    train_loader = datamanager.train_loader
+    # datamanager = torchreid.data.ImageDataManager(
+    #     root=args.root,
+    #     sources=args.sources,
+    #     targets=None,
+    #     height=256,
+    #     width=128,
+    #     batch_size_train=100,
+    #     batch_size_test=100,
+    #     transforms=None,
+    #     norm_mean=[0., 0., 0.],
+    #     norm_std=[1., 1., 1.],
+    #     train_sampler='SequentialSampler'
+    # )
+    # train_loader = datamanager.train_loader
+
+    train_loader = torch.utils.data.DataLoader(
+        torchvision.datasets.ImageFolder("data/train",
+        transform=torchvision.transforms.ToTensor()),
+        batch_size=6)
 
     print('Computing mean and std ...')
     mean = 0.
     std = 0.
     n_samples = 0.
-    for data in train_loader:
-        data = data[0]
+    for data, label in train_loader:
         batch_size = data.size(0)
         data = data.view(batch_size, data.size(1), -1)
         mean += data.mean(2).sum(0)
