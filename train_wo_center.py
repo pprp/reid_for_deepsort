@@ -19,12 +19,11 @@ parser = argparse.ArgumentParser(description="Train on market1501")
 parser.add_argument("--data-dir", default='data', type=str)
 parser.add_argument("--no-cuda", action="store_true")
 parser.add_argument("--gpu-id", default=0, type=int)
-parser.add_argument("--lr", default=0.001, type=float)
+parser.add_argument("--lr", default=0.1, type=float)
 parser.add_argument("--interval", '-i', default=10, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
-parser.add_argument('--model', type=str, default="resnet18")
-parser.add_argument('--pretrained', action="store_true")
-
+parser.add_argument('--model', type=str, default="mudeep")
+parser.add_argument('--pretrained',action="store_true")
 args = parser.parse_args()
 
 # device
@@ -85,12 +84,8 @@ if args.resume:
 net.to(device)
 
 # loss and optimizer
-criterion_model = torch.nn.CrossEntropyLoss(
-)  #CenterLoss(num_classes=num_classes)
+criterion_model = torch.nn.CrossEntropyLoss()
 optimizer_model = torch.optim.SGD(net.parameters(), args.lr)  # from 3e-4 to 3e-5
-criterion_center = CenterLoss(num_classes=num_classes, feat_dim=num_classes)
-optimizer_center = optim.Adam(criterion_center.parameters(), lr=0.005)
-
 scheduler = optim.lr_scheduler.StepLR(  # best lr 1e-3
     optimizer_model, step_size=20, gamma=0.1)
 
@@ -112,17 +107,12 @@ def train(epoch):
         inputs, labels = inputs.to(device), labels.to(device)
         outputs = net(inputs)
 
-        loss_center = criterion_center(outputs, labels)
-        loss_model = criterion_model(outputs, labels)
-
-        loss = 0.2 * loss_center + 0.8 * loss_model
+        loss = criterion_model(outputs, labels)
 
         # backward
-        optimizer_center.zero_grad()
         optimizer_model.zero_grad()
         loss.backward()
         optimizer_model.step()
-        optimizer_center.step()
 
         # accumurating
         training_loss += loss.item()
@@ -135,9 +125,8 @@ def train(epoch):
         if (idx + 1) % interval == 0:
             end = time.time()
             print(
-                "epoch:{:d}|step:{:03d}|time:{:03.2f}s|Loss:{:03.5f}|center loss:{:03.4f}|model loss:{:03.4f}|Acc:{:02.3f}%"
+                "epoch:{:d}|step:{:03d}|time:{:03.2f}s|Loss:{:03.5f}|Acc:{:02.3f}%"
                 .format(epoch, idx, end - start, training_loss / interval,
-                        0.2 * loss_center.item(), 0.8 * loss_model.item(),
                         100. * correct / total))
             training_loss = 0.
             start = time.time()
@@ -156,7 +145,6 @@ def test(epoch):
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = net(inputs)
             loss = criterion_model(outputs, labels)
-
             test_loss += loss.item()
             correct += outputs.max(dim=1)[1].eq(labels).sum().item()
             total += labels.size(0)

@@ -3,23 +3,25 @@ import torchvision.transforms as transforms
 import numpy as np
 import cv2
 
-from .model import Net
+from models import build_model
+from train import input_size
 
 
 class Extractor(object):
-    def __init__(self, model_path, use_cuda=True):
-        self.net = Net(reid=True)
+    def __init__(self, model_name, model_path, use_cuda=True):
+        self.net = build_model(name=model_name,
+                               num_classes=96)  #osnet_small(96, reid=True)
         self.device = "cuda" if torch.cuda.is_available(
         ) and use_cuda else "cpu"
-        state_dict = torch.load(
-            model_path, map_location=lambda storage, loc: storage)['net_dict']
+        state_dict = torch.load(model_path)['net_dict']
         self.net.load_state_dict(state_dict)
         print("Loading weights from {}... Done!".format(model_path))
         self.net.to(self.device)
-        self.size = (64, 128)
+        self.size = input_size
         self.norm = transforms.Compose([
             transforms.ToTensor(),
-            transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225]),
+            transforms.Normalize([0.3568, 0.3141, 0.2781],
+                                 [0.1752, 0.1857, 0.1879])
         ])
 
     def _preprocess(self, im_crops):
@@ -44,5 +46,12 @@ class Extractor(object):
         im_batch = self._preprocess(im_crops)
         with torch.no_grad():
             im_batch = im_batch.to(self.device)
-            features = self.net(im_batch)
+            output, features = self.net(im_batch)
+        print(output, features)
         return features.cpu().numpy()
+
+
+if __name__ == '__main__':
+    img = cv2.imread("data/reid/cutout13_0/cutout13_0_0.jpg")[:, :, (2, 1, 0)]
+    extr = Extractor("mudeep","checkpoint/mudeep/mudeep_best.pt")
+    feature = extr([img, img])

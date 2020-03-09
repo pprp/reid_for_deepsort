@@ -54,7 +54,7 @@ def extract_features(model, dataloader):
         img, label = data
         bs, c, h, w = img.size()
         count += bs
-        ff = torch.FloatTensor(bs, 512).zero_()  # 2048 if res50
+        ff = torch.FloatTensor(bs, 96).zero_()  # 2048 if res50
         print(count, end='\r')
         sys.stdout.flush()
         # add two features
@@ -146,9 +146,11 @@ if __name__ == "__main__":
 
     model = build_model(name=args.model, num_classes=len(class_names))
     assert os.path.isfile(
-        "./checkpoint/last.pt"), "Error: no checkpoint file found!"
+        "./checkpoint/%s/%s_last.pt" %
+        (args.model, args.model)), "Error: no checkpoint file found!"
     print('Loading from checkpoint/last.pt')
-    checkpoint = torch.load("./checkpoint/last.pt")
+    checkpoint = torch.load("./checkpoint/%s/%s_last.pt" %
+                            (args.model, args.model))
     net_dict = checkpoint['net_dict']
     model.load_state_dict(net_dict)
 
