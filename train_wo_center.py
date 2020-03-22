@@ -3,15 +3,17 @@ import os
 import time
 
 import numpy as np
-import matplotlib.pyplot as plt
 import torch
 import torch.backends.cudnn as cudnn
-import torchvision
 import torch.optim as optim
+import torchvision
 
+import matplotlib
+import matplotlib.pyplot as plt
+from models import build_model
 from utils.center_loss import CenterLoss
 
-from models import build_model
+matplotlib.use('Agg')
 
 input_size = (128, 128)
 
@@ -23,7 +25,7 @@ parser.add_argument("--lr", default=0.1, type=float)
 parser.add_argument("--interval", '-i', default=10, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
 parser.add_argument('--model', type=str, default="mudeep")
-parser.add_argument('--pretrained',action="store_true")
+parser.add_argument('--pretrained', action="store_true")
 args = parser.parse_args()
 
 # device
@@ -53,14 +55,14 @@ transform_test = torchvision.transforms.Compose([
 ])
 trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     train_dir, transform=transform_train),
-                                          batch_size=32,
-                                          shuffle=True,
-                                          num_workers=4)
+    batch_size=32,
+    shuffle=True,
+    num_workers=4)
 testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     test_dir, transform=transform_test),
-                                         batch_size=32,
-                                         shuffle=True,
-                                         num_workers=4)
+    batch_size=32,
+    shuffle=True,
+    num_workers=4)
 
 num_classes = len(trainloader.dataset.classes)
 
@@ -68,7 +70,8 @@ num_classes = len(trainloader.dataset.classes)
 # net definition #
 ##################
 start_epoch = 0
-net = build_model(name=args.model, num_classes=num_classes, pretrained=args.pretrained)
+net = build_model(name=args.model, num_classes=num_classes,
+                  pretrained=args.pretrained)
 
 if args.resume:
     assert os.path.isfile(
@@ -85,7 +88,8 @@ net.to(device)
 
 # loss and optimizer
 criterion_model = torch.nn.CrossEntropyLoss()
-optimizer_model = torch.optim.SGD(net.parameters(), args.lr)  # from 3e-4 to 3e-5
+optimizer_model = torch.optim.SGD(
+    net.parameters(), args.lr)  # from 3e-4 to 3e-5
 scheduler = optim.lr_scheduler.StepLR(  # best lr 1e-3
     optimizer_model, step_size=20, gamma=0.1)
 

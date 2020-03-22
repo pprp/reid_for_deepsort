@@ -12,6 +12,11 @@ import torch.optim as optim
 from utils.center_loss import CenterLoss
 
 from models import build_model
+import matplotlib
+
+matplotlib.use('Agg')
+
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 input_size = (128, 128)
 
@@ -54,12 +59,12 @@ transform_test = torchvision.transforms.Compose([
 ])
 trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     train_dir, transform=transform_train),
-                                          batch_size=32,
+                                          batch_size=4,
                                           shuffle=True,
                                           num_workers=4)
 testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
     test_dir, transform=transform_test),
-                                         batch_size=32,
+                                         batch_size=4,
                                          shuffle=True,
                                          num_workers=4)
 
