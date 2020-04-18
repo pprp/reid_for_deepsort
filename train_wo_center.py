@@ -2,16 +2,16 @@ import argparse
 import os
 import time
 
-import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
 import torch
 import torch.backends.cudnn as cudnn
 import torch.optim as optim
 import torchvision
+from torchvision import datasets
 
-import matplotlib
-import matplotlib.pyplot as plt
+from eval import get_result
 from models import build_model
-from utils.center_loss import CenterLoss
 
 matplotlib.use('Agg')
 
@@ -53,31 +53,34 @@ transform_test = torchvision.transforms.Compose([
     torchvision.transforms.Normalize([0.3568, 0.3141, 0.2781],
                                      [0.1752, 0.1857, 0.1879])
 ])
-trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
-    train_dir, transform=transform_train),
-    batch_size=32,
-    shuffle=True,
-    num_workers=4)
-testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
-    test_dir, transform=transform_test),
-    batch_size=32,
-    shuffle=True,
-    num_workers=4)
+train_datasets = datasets.ImageFolder(train_dir, transform=transform_train)
+test_datasets = datasets.ImageFolder(test_dir, transform=transform_test)
+
+trainloader = torch.utils.data.DataLoader(train_datasets,
+                                          batch_size=64,
+                                          shuffle=True,
+                                          num_workers=4)
+
+testloader = torch.utils.data.DataLoader(test_datasets,
+                                         batch_size=64,
+                                         shuffle=True,
+                                         num_workers=4)
 
 num_classes = len(trainloader.dataset.classes)
 
 ##################
 # net definition #
 ##################
+
 start_epoch = 0
 net = build_model(name=args.model, num_classes=num_classes,
                   pretrained=args.pretrained)
 
 if args.resume:
     assert os.path.isfile(
-        "./checkpoint/best.pt"), "Error: no checkpoint file found!"
+        "./weights/best.pt"), "Error: no checkpoint file found!"
     print('Loading from checkpoint/best.pt')
-    checkpoint = torch.load("./checkpoint/best.pt")
+    checkpoint = torch.load("./weights/best.pt")
     # import ipdb; ipdb.set_trace()
     net_dict = checkpoint['net_dict']
     net.load_state_dict(net_dict)
@@ -163,10 +166,10 @@ def test(epoch):
 
     # saving checkpoint
     acc = 100. * correct / total
-    if not os.path.isdir('checkpoint'):
-        os.mkdir('checkpoint')
+    if not os.path.isdir('weights'):
+        os.mkdir('weights')
 
-    save_path = os.path.join("checkpoint", args.model)
+    save_path = os.path.join("weights", args.model)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
@@ -180,9 +183,9 @@ def test(epoch):
             'epoch': epoch,
         }
         torch.save(checkpoint,
-                   './checkpoint/%s/%s_best.pt' % (args.model, args.model))
+                   './weights/%s/%s_best.pt' % (args.model, args.model))
         torch.save(checkpoint,
-                   './checkpoint/%s/%s_last.pt' % (args.model, args.model))
+                   './weights/%s/%s_last.pt' % (args.model, args.model))
     else:
         checkpoint = {
             'net_dict': net.state_dict(),
@@ -190,7 +193,10 @@ def test(epoch):
             'epoch': epoch,
         }
         torch.save(checkpoint,
-                   './checkpoint/%s/%s_last.pt' % (args.model, args.model))
+                   './weights/%s/%s_last.pt' % (args.model, args.model))
+    # rank and mAP
+    net.eval()
+    get_result(net, trainloader, testloader, train_datasets, test_datasets)
 
     return test_loss / len(testloader), 1. - correct / total
 

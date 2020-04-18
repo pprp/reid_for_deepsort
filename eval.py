@@ -15,12 +15,14 @@ from models import build_model
 test_transforms = transforms.Compose([
     transforms.Resize(input_size),
     transforms.ToTensor(),
-    transforms.Normalize([0.3568, 0.3141, 0.2781], [0.1752, 0.1857, 0.1879])
+    transforms.Normalize([0.3568, 0.3141, 0.2781],
+                         [0.1752, 0.1857, 0.1879])
 ])
 
-gallery_datasets = datasets.ImageFolder(os.path.join("data", "gallery"),
+gallery_datasets = datasets.ImageFolder(os.path.join("data", "train"),
                                         transform=test_transforms)
-query_datasets = datasets.ImageFolder(os.path.join("data", "query"),
+
+query_datasets = datasets.ImageFolder(os.path.join("data", "val"),
                                       transform=test_transforms)
 
 gallery_dataloader = DataLoader(gallery_datasets,
@@ -43,8 +45,8 @@ class_names = gallery_datasets.classes
 def fliplr(img):
     '''flip horizontal'''
     inv_idx = torch.arange(img.size(3) - 1, -1, -1).long()
-    img_flip = img.index_select(3, inv_idx)  # flip along w
-    return img_flip
+    imgallery_featureslip = img.index_select(3, inv_idx)  # flip along w
+    return imgallery_featureslip
 
 
 def extract_features(model, dataloader):
@@ -89,7 +91,7 @@ def get_label(img_path):
 
 def compute_mAP(index, good_index, junk_index):
     ap = 0
-    cmc = torch.IntTensor(len(index)).zero_()  #len = 20 得到前20个
+    cmc = torch.IntTensor(len(index)).zero_()  # len = 20 得到前20个
     if good_index.size == 0:
         cmc[0] = -1
         return ap, cmc
@@ -121,7 +123,7 @@ def evaluate(qf, ql, gf, gl):
     score = torch.mm(gf, query)  # 计算得分[1, num]
     score = score.squeeze(1).cpu()
     score = score.numpy()
-    #predict index
+    # predict index
     index = np.argsort(score)
     index = index[::-1]  # index 倒过来
     # 得到前20个
@@ -136,26 +138,10 @@ def evaluate(qf, ql, gf, gl):
     return CMC
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser('help')
-    parser.add_argument('--weight_path',
-                        type=str,
-                        default="./checkpints/last.pt")
-    parser.add_argument("--model", type=str, default="mudeep")
-    args = parser.parse_args()
-
-    model = build_model(name=args.model, num_classes=len(class_names))
-    assert os.path.isfile(
-        "./checkpoint/%s/%s_last.pt" %
-        (args.model, args.model)), "Error: no checkpoint file found!"
-    print('Loading from checkpoint/last.pt')
-    checkpoint = torch.load("./checkpoint/%s/%s_last.pt" %
-                            (args.model, args.model))
-    net_dict = checkpoint['net_dict']
-    model.load_state_dict(net_dict)
-
+def get_result(model, gallery_dataloader, query_dataloader,
+               gallery_datasets, query_datasets):
     model.eval()
-    if use_gpu:
+    if torch.cuda.is_available():
         model = model.cuda()
 
     gallery_features = extract_features(model, gallery_dataloader)
@@ -164,7 +150,7 @@ if __name__ == "__main__":
     gallery_label = np.array(get_label(gallery_datasets.imgs))
     query_label = np.array(get_label(query_datasets.imgs))
 
-    if use_gpu:
+    if torch.cuda.is_available():
         gallery_features = gallery_features.cuda()
         query_features = query_features.cuda()
 
@@ -184,3 +170,53 @@ if __name__ == "__main__":
 
     print("\tRank@1:%f\n\tRank@5:%f\n\tRank@10:%f\n\tmAP:%f" %
           (CMC[0], CMC[4], CMC[9], ap / len(query_label)))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser('help')
+    parser.add_argument('--weight_path',
+                        type=str,
+                        default="checkpoint/resnet18/resnet18_best.pt")
+    parser.add_argument("--model", type=str, default="resnet18")
+    args = parser.parse_args()
+
+    model = build_model(name=args.model, num_classes=len(class_names))
+
+    checkpoint = torch.load(args.weight_path)
+
+    net_dict = checkpoint['net_dict']
+    model.load_state_dict(net_dict)
+
+    model.eval()
+    if use_gpu:
+        model = model.cuda()
+
+    get_result(model, gallery_dataloader, query_dataloader,
+               gallery_datasets, query_datasets)
+
+    # gallery_features = extract_features(model, gallery_dataloader)
+    # query_features = extract_features(model, query_dataloader)
+
+    # gallery_label = np.array(get_label(gallery_datasets.imgs))
+    # query_label = np.array(get_label(query_datasets.imgs))
+
+    # if use_gpu:
+    #     gallery_features = gallery_features.cuda()
+    #     query_features = query_features.cuda()
+
+    # CMC = torch.IntTensor(len(gallery_label)).zero_()
+    # ap = 0.0
+    # for i in range(len(query_label)):
+    #     ap_tmp, CMC_tmp = evaluate(query_features[i], query_label[i],
+    #                                gallery_features, gallery_label)
+    #     if CMC_tmp[0] == -1:
+    #         continue
+    #     CMC = CMC + CMC_tmp
+    #     # print(i, ":",ap_tmp)
+    #     ap += ap_tmp
+
+    # CMC = CMC.float()
+    # CMC = CMC / len(query_label)
+
+    # print("\tRank@1:%f\n\tRank@5:%f\n\tRank@10:%f\n\tmAP:%f" %
+    #       (CMC[0], CMC[4], CMC[9], ap / len(query_label)))

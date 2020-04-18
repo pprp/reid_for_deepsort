@@ -37,7 +37,7 @@ class Extractor(object):
         im_batch = torch.cat([
             self.norm(_resize(im, self.size)).unsqueeze(0) for im in im_crops
         ],
-                             dim=0).float()
+            dim=0).float()
         return im_batch
 
     def __call__(self, im_crops):

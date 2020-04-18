@@ -53,5 +53,5 @@ class Extractor(object):
 
 if __name__ == '__main__':
     img = cv2.imread("data/reid/cutout13_0/cutout13_0_0.jpg")[:, :, (2, 1, 0)]
-    extr = Extractor("mudeep","checkpoint/mudeep/mudeep_best.pt")
+    extr = Extractor("mudeep","weights/mudeep/mudeep_best.pt")
     feature = extr([img, img])

@@ -2,17 +2,17 @@ import argparse
 import os
 import time
 
-import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import torch
 import torch.backends.cudnn as cudnn
-import torchvision
 import torch.optim as optim
+import torchvision
+from torchvision import datasets
 
-from utils.center_loss import CenterLoss
-
+from eval import get_result
 from models import build_model
-import matplotlib
+from utils.center_loss import CenterLoss
 
 matplotlib.use('Agg')
 
@@ -20,14 +20,14 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 input_size = (128, 128)
 
-parser = argparse.ArgumentParser(description="Train on market1501")
+parser = argparse.ArgumentParser(description="Train on my own dataset")
 parser.add_argument("--data-dir", default='data', type=str)
 parser.add_argument("--no-cuda", action="store_true")
 parser.add_argument("--gpu-id", default=0, type=int)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--interval", '-i', default=10, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
-parser.add_argument('--model', type=str, default="resnet18")
+parser.add_argument('--model', type=str, default="squeezenet1_0")
 parser.add_argument('--pretrained', action="store_true")
 
 args = parser.parse_args()
@@ -57,14 +57,17 @@ transform_test = torchvision.transforms.Compose([
     torchvision.transforms.Normalize([0.3568, 0.3141, 0.2781],
                                      [0.1752, 0.1857, 0.1879])
 ])
-trainloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
-    train_dir, transform=transform_train),
-                                          batch_size=4,
+
+train_datasets = datasets.ImageFolder(train_dir, transform=transform_train)
+test_datasets = datasets.ImageFolder(test_dir, transform=transform_test)
+
+trainloader = torch.utils.data.DataLoader(train_datasets,
+                                          batch_size=64,
                                           shuffle=True,
                                           num_workers=4)
-testloader = torch.utils.data.DataLoader(torchvision.datasets.ImageFolder(
-    test_dir, transform=transform_test),
-                                         batch_size=4,
+
+testloader = torch.utils.data.DataLoader(test_datasets,
+                                         batch_size=64,
                                          shuffle=True,
                                          num_workers=4)
 
@@ -74,7 +77,8 @@ num_classes = len(trainloader.dataset.classes)
 # net definition #
 ##################
 start_epoch = 0
-net = build_model(name=args.model, num_classes=num_classes, pretrained=args.pretrained)
+net = build_model(name=args.model, num_classes=num_classes,
+                  pretrained=args.pretrained)
 
 if args.resume:
     assert os.path.isfile(
@@ -91,8 +95,9 @@ net.to(device)
 
 # loss and optimizer
 criterion_model = torch.nn.CrossEntropyLoss(
-)  #CenterLoss(num_classes=num_classes)
-optimizer_model = torch.optim.SGD(net.parameters(), args.lr)  # from 3e-4 to 3e-5
+)  # CenterLoss(num_classes=num_classes)
+optimizer_model = torch.optim.SGD(
+    net.parameters(), args.lr)  # from 3e-4 to 3e-5
 criterion_center = CenterLoss(num_classes=num_classes, feat_dim=num_classes)
 optimizer_center = optim.Adam(criterion_center.parameters(), lr=0.005)
 
@@ -151,7 +156,8 @@ def train(epoch):
 
 def test(epoch):
     global best_acc
-    net.eval()
+    # net.eval()
+    # net.train()
     test_loss = 0.
     correct = 0
     total = 0
@@ -204,6 +210,10 @@ def test(epoch):
         }
         torch.save(checkpoint,
                    './checkpoint/%s/%s_last.pt' % (args.model, args.model))
+
+    # rank and mAP
+    net.eval()
+    get_result(net, trainloader, testloader, train_datasets, test_datasets)
 
     return test_loss / len(testloader), 1. - correct / total
 
