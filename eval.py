@@ -64,10 +64,8 @@ def extract_features(model, dataloader):
             if i == 1:
                 img = fliplr(img)
             input_img = Variable(img.cuda())
-            # print("=", input_img.shape)
             feature = model(input_img)
             feature = feature.data.cpu()
-            # print(ff.shape, feature.shape)
             ff = ff + feature
         # norm features
         fnorm = torch.norm(ff, p=2, dim=1, keepdim=True)
@@ -140,19 +138,12 @@ def evaluate(qf, ql, gf, gl):
 
 def get_result(model, gallery_dataloader, query_dataloader,
                gallery_datasets, query_datasets):
-    model.eval()
-    if torch.cuda.is_available():
-        model = model.cuda()
 
     gallery_features = extract_features(model, gallery_dataloader)
     query_features = extract_features(model, query_dataloader)
 
     gallery_label = np.array(get_label(gallery_datasets.imgs))
     query_label = np.array(get_label(query_datasets.imgs))
-
-    if torch.cuda.is_available():
-        gallery_features = gallery_features.cuda()
-        query_features = query_features.cuda()
 
     CMC = torch.IntTensor(len(gallery_label)).zero_()
     ap = 0.0
@@ -176,8 +167,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser('help')
     parser.add_argument('--weight_path',
                         type=str,
-                        default="checkpoint/resnet18/resnet18_best.pt")
-    parser.add_argument("--model", type=str, default="resnet18")
+                        default="weights/mudeep/mudeep_best.pt")
+    parser.add_argument("--model", type=str, default="mudeep")
     args = parser.parse_args()
 
     model = build_model(name=args.model, num_classes=len(class_names))
@@ -193,30 +184,3 @@ if __name__ == "__main__":
 
     get_result(model, gallery_dataloader, query_dataloader,
                gallery_datasets, query_datasets)
-
-    # gallery_features = extract_features(model, gallery_dataloader)
-    # query_features = extract_features(model, query_dataloader)
-
-    # gallery_label = np.array(get_label(gallery_datasets.imgs))
-    # query_label = np.array(get_label(query_datasets.imgs))
-
-    # if use_gpu:
-    #     gallery_features = gallery_features.cuda()
-    #     query_features = query_features.cuda()
-
-    # CMC = torch.IntTensor(len(gallery_label)).zero_()
-    # ap = 0.0
-    # for i in range(len(query_label)):
-    #     ap_tmp, CMC_tmp = evaluate(query_features[i], query_label[i],
-    #                                gallery_features, gallery_label)
-    #     if CMC_tmp[0] == -1:
-    #         continue
-    #     CMC = CMC + CMC_tmp
-    #     # print(i, ":",ap_tmp)
-    #     ap += ap_tmp
-
-    # CMC = CMC.float()
-    # CMC = CMC / len(query_label)
-
-    # print("\tRank@1:%f\n\tRank@5:%f\n\tRank@10:%f\n\tmAP:%f" %
-    #       (CMC[0], CMC[4], CMC[9], ap / len(query_label)))

@@ -142,7 +142,7 @@ def train(epoch):
 
 def test(epoch):
     global best_acc
-    net.eval()
+    # net.eval()
     test_loss = 0.
     correct = 0
     total = 0
@@ -195,8 +195,9 @@ def test(epoch):
         torch.save(checkpoint,
                    './weights/%s/%s_last.pt' % (args.model, args.model))
     # rank and mAP
-    net.eval()
-    get_result(net, trainloader, testloader, train_datasets, test_datasets)
+    # net.eval()
+    # TODO BUG 
+    # get_result(net, trainloader, testloader, train_datasets, test_datasets)
 
     return test_loss / len(testloader), 1. - correct / total
 

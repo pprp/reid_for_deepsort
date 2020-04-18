@@ -27,7 +27,7 @@ parser.add_argument("--gpu-id", default=0, type=int)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--interval", '-i', default=10, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
-parser.add_argument('--model', type=str, default="squeezenet1_0")
+parser.add_argument('--model', type=str, default="resnet50_ibn_a")
 parser.add_argument('--pretrained', action="store_true")
 
 args = parser.parse_args()
@@ -45,7 +45,6 @@ train_dir = os.path.join(root, "train")
 test_dir = os.path.join(root, "val")
 
 transform_train = torchvision.transforms.Compose([
-    torchvision.transforms.RandomHorizontalFlip(),
     torchvision.transforms.Resize(input_size),
     torchvision.transforms.ToTensor(),
     torchvision.transforms.Normalize([0.3568, 0.3141, 0.2781],
@@ -212,8 +211,9 @@ def test(epoch):
                    './checkpoint/%s/%s_last.pt' % (args.model, args.model))
 
     # rank and mAP
-    net.eval()
-    get_result(net, trainloader, testloader, train_datasets, test_datasets)
+    # net.eval()
+    # TODO BUG
+    # get_result(net, trainloader, testloader, train_datasets, test_datasets)
 
     return test_loss / len(testloader), 1. - correct / total
 

@@ -173,13 +173,15 @@ class MuDeep(nn.Module):
         # in shape, i.e. (3, 256, 128), such that the last convolutional feature
         # maps are of shape (256, 16, 8). If input shape is changed,
         # the input dimension of this layer has to be changed accordingly.
+
+        self.gap = nn.AdaptiveAvgPool2d(1)
         self.fc = nn.Sequential(
-            nn.Linear(256 * 8 * 8, 4096),
-            nn.BatchNorm1d(4096),
+            nn.Linear(256, 512),
+            nn.BatchNorm1d(512),
             nn.ReLU(),
         )
-        self.classifier = nn.Linear(4096, num_classes)
-        self.feat_dim = 4096
+        self.classifier = nn.Linear(512, num_classes)
+        self.feat_dim = 512
 
     def featuremaps(self, x):
         x = self.block1(x)
@@ -191,6 +193,7 @@ class MuDeep(nn.Module):
 
     def forward(self, x, return_featuremaps=False):
         x = self.featuremaps(x)
+        x = self.gap(x)
         if return_featuremaps:
             return x
         x = x.view(x.size(0), -1)
