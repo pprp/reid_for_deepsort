@@ -193,9 +193,9 @@ class MuDeep(nn.Module):
 
     def forward(self, x, return_featuremaps=False):
         x = self.featuremaps(x)
-        x = self.gap(x)
         if return_featuremaps:
             return x
+        x = self.gap(x)
         x = x.view(x.size(0), -1)
         x = self.fc(x)
         y = self.classifier(x)

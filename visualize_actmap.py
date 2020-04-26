@@ -151,8 +151,7 @@ def visactmap(model,
 
     if True:
         target = "cow"
-        # for target in list(test_loader.keys()):
-        data_loader = test_loader  #test_loader[target]['query'] # only process query images
+        data_loader = test_loader
         # original images and activation maps are saved individually
         actmap_dir = osp.join(save_dir, 'actmap_' + target)
         mkdir_if_missing(actmap_dir)
@@ -191,13 +190,14 @@ def visactmap(model,
 
             for j in range(outputs.size(0)):
                 # get image name
-                path = datasets.imgs[j][0] #paths[j]
+                path = datasets.imgs[j][0]  # paths[j]
                 imname = osp.basename(osp.splitext(path)[0])
 
                 # RGB image
                 img = imgs[j, ...]
                 for t, m, s in zip(img, img_mean, img_std):
                     t.mul_(s).add_(m).clamp_(0, 1)
+
                 img_np = np.uint8(np.floor(img.numpy() * 255))
                 img_np = img_np.transpose((1, 2, 0))  # (c, h, w) -> (h, w, c)
 
@@ -222,7 +222,8 @@ def visactmap(model,
                 grid_img[:, width + GRID_SPACING:2 * width +
                          GRID_SPACING, :] = am
                 grid_img[:, 2 * width + 2 * GRID_SPACING:, :] = overlapped
-                cv2.imwrite(osp.join(actmap_dir, imname + '.jpg'), grid_img)
+                cv2.imwrite(osp.join(actmap_dir, imname +
+                                     '_%d_%d.jpg' % (batch_idx, j)), grid_img)
 
             if (batch_idx + 1) % 10 == 0:
                 print('- done batch {}/{}'.format(batch_idx + 1,
@@ -232,7 +233,6 @@ def visactmap(model,
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--root', type=str)
-    # parser.add_argument('-d', '--dataset', type=str, default='market1501')
     parser.add_argument('-m', '--model', type=str, default='mudeep')
     parser.add_argument('--weights', type=str)
     parser.add_argument('--save-dir', type=str, default='log')
@@ -260,11 +260,11 @@ def main():
                         num_classes=len(test_loader.dataset.classes),
                         use_gpu=use_gpu)
 
-    if use_gpu:
-        model = model.cuda()
-
     if args.weights and check_isfile(args.weights):
         load_pretrained_weights(model, args.weights)
+
+    if use_gpu:
+        model = model.cuda()
 
     visactmap(model, test_loader, args.save_dir, args.width, args.height,
               use_gpu, test_datasets)

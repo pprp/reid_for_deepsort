@@ -27,7 +27,7 @@ parser.add_argument("--gpu-id", default=0, type=int)
 parser.add_argument("--lr", default=0.001, type=float)
 parser.add_argument("--interval", '-i', default=10, type=int)
 parser.add_argument('--resume', '-r', action='store_true')
-parser.add_argument('--model', type=str, default="resnet50_ibn_a")
+parser.add_argument('--model', type=str, default="mudeep")
 parser.add_argument('--pretrained', action="store_true")
 
 args = parser.parse_args()
@@ -81,14 +81,14 @@ net = build_model(name=args.model, num_classes=num_classes,
 
 if args.resume:
     assert os.path.isfile(
-        "./checkpoint/best.pt"), "Error: no checkpoint file found!"
-    print('Loading from checkpoint/best.pt')
-    checkpoint = torch.load("./checkpoint/best.pt")
+        "./weights/best.pt"), "Error: no weights file found!"
+    print('Loading from weights/best.pt')
+    weights = torch.load("./weights/best.pt")
     # import ipdb; ipdb.set_trace()
-    net_dict = checkpoint['net_dict']
+    net_dict = weights['net_dict']
     net.load_state_dict(net_dict)
-    best_acc = checkpoint['acc']
-    start_epoch = checkpoint['epoch']
+    best_acc = weights['acc']
+    start_epoch = weights['epoch']
 
 net.to(device)
 
@@ -105,8 +105,9 @@ scheduler = optim.lr_scheduler.StepLR(  # best lr 1e-3
 
 best_acc = 0.
 
-
 # train function for each epoch
+
+
 def train(epoch):
     print('=' * 30, "Training", "=" * 30)
     net.train()
@@ -179,36 +180,36 @@ def test(epoch):
             .format(epoch, end - start, test_loss / len(testloader), correct,
                     total, 100. * correct / total))
 
-    # saving checkpoint
+    # saving weights
     acc = 100. * correct / total
-    if not os.path.isdir('checkpoint'):
-        os.mkdir('checkpoint')
+    if not os.path.isdir('weights'):
+        os.mkdir('weights')
 
-    save_path = os.path.join("checkpoint", args.model)
+    save_path = os.path.join("weights", args.model)
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
     if acc > best_acc:
         best_acc = acc
-        print("Saving parameters to checkpoint/best.pt")
+        print("Saving parameters to weights/best.pt")
 
-        checkpoint = {
+        weights = {
             'net_dict': net.state_dict(),
             'acc': acc,
             'epoch': epoch,
         }
-        torch.save(checkpoint,
-                   './checkpoint/%s/%s_best.pt' % (args.model, args.model))
-        torch.save(checkpoint,
-                   './checkpoint/%s/%s_last.pt' % (args.model, args.model))
+        torch.save(weights,
+                   './weights/%s/%s_best.pt' % (args.model, args.model))
+        torch.save(weights,
+                   './weights/%s/%s_last.pt' % (args.model, args.model))
     else:
-        checkpoint = {
+        weights = {
             'net_dict': net.state_dict(),
             'acc': acc,
             'epoch': epoch,
         }
-        torch.save(checkpoint,
-                   './checkpoint/%s/%s_last.pt' % (args.model, args.model))
+        torch.save(weights,
+                   './weights/%s/%s_last.pt' % (args.model, args.model))
 
     # rank and mAP
     # net.eval()
