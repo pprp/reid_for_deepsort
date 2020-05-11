@@ -196,7 +196,7 @@ def test(epoch):
                    './weights/%s/%s_last.pt' % (args.model, args.model))
     # rank and mAP
     # net.eval()
-    # TODO BUG 
+    # TODO BUG
     # get_result(net, trainloader, testloader, train_datasets, test_datasets)
 
     return test_loss / len(testloader), 1. - correct / total

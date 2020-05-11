@@ -10,7 +10,7 @@ from train import input_size
 class Extractor(object):
     def __init__(self, model_name, model_path, use_cuda=True):
         self.net = build_model(name=model_name,
-                               num_classes=96)  #osnet_small(96, reid=True)
+                               num_classes=96)  # osnet_small(96, reid=True)
         self.device = "cuda" if torch.cuda.is_available(
         ) and use_cuda else "cpu"
         state_dict = torch.load(model_path)['net_dict']
@@ -39,7 +39,7 @@ class Extractor(object):
         im_batch = torch.cat([
             self.norm(_resize(im, self.size)).unsqueeze(0) for im in im_crops
         ],
-                             dim=0).float()
+            dim=0).float()
         return im_batch
 
     def __call__(self, im_crops):
@@ -53,5 +53,5 @@ class Extractor(object):
 
 if __name__ == '__main__':
     img = cv2.imread("data/reid/cutout13_0/cutout13_0_0.jpg")[:, :, (2, 1, 0)]
-    extr = Extractor("mudeep","weights/mudeep/mudeep_best.pt")
+    extr = Extractor("mudeep", "weights/mudeep/mudeep_best.pt")
     feature = extr([img, img])
