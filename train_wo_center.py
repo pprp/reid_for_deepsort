@@ -205,7 +205,8 @@ def test(epoch):
 # plot figure
 x_epoch = []
 record = {'train_loss': [], 'train_err': [], 'test_loss': [], 'test_err': []}
-fig = plt.figure()
+fig = plt.figure(figsize=(10,5))
+plt.style.use('ggplot')
 ax0 = fig.add_subplot(121, title="loss")
 ax1 = fig.add_subplot(122, title="top1err")
 
@@ -218,14 +219,14 @@ def draw_curve(epoch, train_loss, train_err, test_loss, test_err):
     record['test_err'].append(test_err)
 
     x_epoch.append(epoch)
-    ax0.plot(x_epoch, record['train_loss'], 'bo-', label='train')
+    ax0.plot(x_epoch, record['train_loss'], 'b.-', label='train')
     ax0.plot(x_epoch, record['test_loss'], 'ro-', label='val')
-    ax1.plot(x_epoch, record['train_err'], 'bo-', label='train')
+    ax1.plot(x_epoch, record['train_err'], 'b.-', label='train')
     ax1.plot(x_epoch, record['test_err'], 'ro-', label='val')
     if epoch == 0:
         ax0.legend()
         ax1.legend()
-    fig.savefig("train.jpg")
+    fig.savefig("train_dpj.jpg")
 
 
 if __name__ == '__main__':
